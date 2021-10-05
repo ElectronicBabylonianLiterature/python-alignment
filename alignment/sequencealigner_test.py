@@ -84,6 +84,17 @@ class SequenceAlignerTests(object):
         assert score == DEFAULT_MATCH_SCORE * 2 + DEFAULT_GAP_SCORE
         assert alignments[0].score == score
 
+    def test_exact_left_match_with_gap_extension(self):
+        score, alignments = self.align('aabb', 'aaoobb')
+        assert len(alignments) == 1
+        assert str(alignments[0].first) == 'a a - - b b'
+        assert str(alignments[0].second) == 'a a o o b b'
+        assert alignments[0].percentIdentity() == 4.0 / 6.0 * 100.0
+        assert alignments[0].percentSimilarity() == 4.0 / 6.0 * 100.0
+        assert alignments[0].percentGap() == 2.0 / 6.0 * 100.0
+        assert score == DEFAULT_MATCH_SCORE * 4 + DEFAULT_GAP_SCORE * 2
+        assert alignments[0].score == score
+
     def test_exact_left_partial_match_with_mismatch(self):
         score, alignments = self.align('xamby', 'aob')
         assert len(alignments) == 1
