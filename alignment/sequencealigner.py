@@ -147,12 +147,30 @@ class SequenceAlignment(object):
 
 # Aligner ---------------------------------------------------------------------
 
+directionF = 1
+directionIx = 2
+directionIy = 3
+
+class AlignmentMatrix:
+    def __init__(self, shape=(0,0)):
+        self.shape = shape
+        self.F = numpy.zeros(shape, int)
+        self.Ix = numpy.zeros(shape, int)
+        self.Iy = numpy.zeros(shape, int)
+        self.dirF = numpy.zeros(shape, int)
+        self.dirIx = numpy.zeros(shape, int)
+        self.dirIy = numpy.zeros(shape, int)
+
+    def max(self):
+        return max(self.F.max(), self.Ix.max(), self.Iy.max())
+
 class SequenceAligner(object):
     __metaclass__ = ABCMeta
 
-    def __init__(self, scoring, gapScore):
+    def __init__(self, scoring, gapScore, gapExtensionScore):
         self.scoring = scoring
         self.gapScore = gapScore
+        self.gapExtensionScore = gapExtensionScore
 
     def align(self, first, second, backtrace=False):
         f = self.computeAlignmentMatrix(first, second)
@@ -172,7 +190,7 @@ class SequenceAligner(object):
 
     @abstractmethod
     def computeAlignmentMatrix(self, first, second):
-        return numpy.zeros(0, int)
+        return AlignmentMatrix()
 
     @abstractmethod
     def bestScore(self, f):
@@ -185,36 +203,36 @@ class SequenceAligner(object):
 
 class GlobalSequenceAligner(SequenceAligner):
 
-    def __init__(self, scoring, gapScore):
-        super(GlobalSequenceAligner, self).__init__(scoring, gapScore)
+    def __init__(self, scoring, gapScore, gapExtensionScore):
+        super(GlobalSequenceAligner, self).__init__(scoring, gapScore, gapExtensionScore)
 
     def computeAlignmentMatrix(self, first, second):
         m = len(first) + 1
         n = len(second) + 1
-        f = numpy.zeros((m, n), int)
+        f = AlignmentMatrix((m,n))
         for i in range(1, m):
             for j in range(1, n):
                 # Match elements.
-                ab = f[i - 1, j - 1] \
+                ab = f.F[i - 1, j - 1] \
                     + self.scoring(first[i - 1], second[j - 1])
 
                 # Gap on first sequence.
                 if i == m - 1:
-                    ga = f[i, j - 1]
+                    ga = f.F[i, j - 1]
                 else:
-                    ga = f[i, j - 1] + self.gapScore
+                    ga = f.F[i, j - 1] + self.gapScore
 
                 # Gap on second sequence.
                 if j == n - 1:
-                    gb = f[i - 1, j]
+                    gb = f.F[i - 1, j]
                 else:
-                    gb = f[i - 1, j] + self.gapScore
+                    gb = f.F[i - 1, j] + self.gapScore
 
-                f[i, j] = max(ab, max(ga, gb))
+                f.F[i, j] = max(ab, max(ga, gb))
         return f
 
     def bestScore(self, f):
-        return f[-1, -1]
+        return f.F[-1, -1]
 
     def backtrace(self, first, second, f):
         m, n = f.shape
@@ -229,10 +247,10 @@ class GlobalSequenceAligner(SequenceAligner):
             alignments.append(alignment.reversed())
         else:
             m, n = f.shape
-            c = f[i, j]
-            p = f[i - 1, j - 1]
-            x = f[i - 1, j]
-            y = f[i, j - 1]
+            c = f.F[i, j]
+            p = f.F[i - 1, j - 1]
+            x = f.F[i - 1, j]
+            y = f.F[i, j - 1]
             a = first[i - 1]
             b = second[j - 1]
             if c == p + self.scoring(a, b):
@@ -263,34 +281,34 @@ class GlobalSequenceAligner(SequenceAligner):
 
 class StrictGlobalSequenceAligner(SequenceAligner):
 
-    def __init__(self, scoring, gapScore):
-        super(StrictGlobalSequenceAligner, self).__init__(scoring, gapScore)
+    def __init__(self, scoring, gapScore, gapExtensionScore):
+        super(StrictGlobalSequenceAligner, self).__init__(scoring, gapScore, gapExtensionScore)
 
     def computeAlignmentMatrix(self, first, second):
         m = len(first) + 1
         n = len(second) + 1
-        f = numpy.zeros((m, n), int)
+        f = AlignmentMatrix((m,n))
         for i in range(1, m):
-            f[i, 0] = f[i - 1, 0] + self.gapScore
+            f.F[i, 0] = f.F[i - 1, 0] + self.gapScore
         for j in range(1, n):
-            f[0, j] = f[0, j - 1] + self.gapScore
+            f.F[0, j] = f.F[0, j - 1] + self.gapScore
         for i in range(1, m):
             for j in range(1, n):
                 # Match elements.
-                ab = f[i - 1, j - 1] \
+                ab = f.F[i - 1, j - 1] \
                     + self.scoring(first[i - 1], second[j - 1])
 
                 # Gap on first sequence.
-                ga = f[i, j - 1] + self.gapScore
+                ga = f.F[i, j - 1] + self.gapScore
 
                 # Gap on second sequence.
-                gb = f[i - 1, j] + self.gapScore
+                gb = f.F[i - 1, j] + self.gapScore
 
-                f[i, j] = max(ab, max(ga, gb))
+                f.F[i, j] = max(ab, max(ga, gb))
         return f
 
     def bestScore(self, f):
-        return f[-1, -1]
+        return f.F[-1, -1]
 
     def backtrace(self, first, second, f):
         m, n = f.shape
@@ -304,9 +322,9 @@ class StrictGlobalSequenceAligner(SequenceAligner):
         if i == 0 and j == 0:
             alignments.append(alignment.reversed())
         else:
-            c = f[i, j]
+            c = f.F[i, j]
             if i != 0:
-                x = f[i - 1, j]
+                x = f.F[i - 1, j]
                 a = first[i - 1]
                 if c == x + self.gapScore:
                     alignment.push(a, alignment.gap, c - x)
@@ -315,7 +333,7 @@ class StrictGlobalSequenceAligner(SequenceAligner):
                     alignment.pop()
                     return
             if j != 0:
-                y = f[i, j - 1]
+                y = f.F[i, j - 1]
                 b = second[j - 1]
                 if c == y + self.gapScore:
                     alignment.push(alignment.gap, b, c - y)
@@ -323,7 +341,7 @@ class StrictGlobalSequenceAligner(SequenceAligner):
                                        alignments, alignment)
                     alignment.pop()
             if i != 0 and j != 0:
-                p = f[i - 1, j - 1]
+                p = f.F[i - 1, j - 1]
                 # Silence the code inspection warning. We know at this point
                 # that a and b are assigned to values.
                 # noinspection PyUnboundLocalVariable
@@ -336,27 +354,27 @@ class StrictGlobalSequenceAligner(SequenceAligner):
 
 class LocalSequenceAligner(SequenceAligner):
 
-    def __init__(self, scoring, gapScore, minScore=None):
-        super(LocalSequenceAligner, self).__init__(scoring, gapScore)
+    def __init__(self, scoring, gapScore, gapExtensionScore, minScore=None):
+        super(LocalSequenceAligner, self).__init__(scoring, gapScore, gapExtensionScore)
         self.minScore = minScore
 
     def computeAlignmentMatrix(self, first, second):
         m = len(first) + 1
         n = len(second) + 1
-        f = numpy.zeros((m, n), int)
+        f = AlignmentMatrix((m, n))
         for i in range(1, m):
             for j in range(1, n):
                 # Match elements.
-                ab = f[i - 1, j - 1] \
+                ab = f.F[i - 1, j - 1] \
                     + self.scoring(first[i - 1], second[j - 1])
 
                 # Gap on sequenceA.
-                ga = f[i, j - 1] + self.gapScore
+                ga = f.F[i, j - 1] + self.gapScore
 
                 # Gap on sequenceB.
-                gb = f[i - 1, j] + self.gapScore
+                gb = f.F[i - 1, j] + self.gapScore
 
-                f[i, j] = max(0, max(ab, max(ga, gb)))
+                f.F[i, j] = max(0, max(ab, max(ga, gb)))
         return f
 
     def bestScore(self, f):
@@ -372,19 +390,19 @@ class LocalSequenceAligner(SequenceAligner):
             minScore = self.minScore
         for i in range(m):
             for j in range(n):
-                if f[i, j] >= minScore:
+                if f.F[i, j] >= minScore:
                     self.backtraceFrom(first, second, f, i, j,
                                        alignments, alignment)
         return alignments
 
     def backtraceFrom(self, first, second, f, i, j, alignments, alignment):
-        if f[i, j] == 0:
+        if f.F[i, j] == 0:
             alignments.append(alignment.reversed())
         else:
-            c = f[i, j]
-            p = f[i - 1, j - 1]
-            x = f[i - 1, j]
-            y = f[i, j - 1]
+            c = f.F[i, j]
+            p = f.F[i - 1, j - 1]
+            x = f.F[i - 1, j]
+            y = f.F[i, j - 1]
             a = first[i - 1]
             b = second[j - 1]
             if c == p + self.scoring(a, b):
