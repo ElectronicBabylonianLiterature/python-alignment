@@ -14,7 +14,8 @@ DEFAULT_GAP_SCORE = -2
 DEFAULT_GAP_START_SCORE = -1
 DEFAULT_GAP_EXTENSION_SCORE = -1
 
-DEFAULT_SCORING = SimpleScoring(DEFAULT_MATCH_SCORE, DEFAULT_MISMATCH_SCORE)
+DEFAULT_SCORING = SimpleScoring(DEFAULT_MATCH_SCORE, DEFAULT_MISMATCH_SCORE, 0, DEFAULT_GAP_SCORE)
+AFFINE_GAP_SCORING = SimpleScoring(DEFAULT_MATCH_SCORE, DEFAULT_MISMATCH_SCORE, DEFAULT_GAP_START_SCORE, DEFAULT_GAP_EXTENSION_SCORE)
 
 
 def _align(first, second, aligner, **kwargs):
@@ -197,7 +198,7 @@ class TestStrictGlobalSequenceAligner(SequenceAlignerTests):
 
 
 class TestLocalSequenceAligner(SequenceAlignerTests):
-    ALIGNER = LocalSequenceAligner(DEFAULT_SCORING, DEFAULT_GAP_START_SCORE, DEFAULT_GAP_EXTENSION_SCORE)
+    ALIGNER = LocalSequenceAligner(AFFINE_GAP_SCORING)
 
     def test_multiple_alignments(self):
         score, alignments = self.align('xabcabcy', 'abc')

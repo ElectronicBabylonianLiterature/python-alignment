@@ -7,7 +7,7 @@ try:
     import numpypy as numpy
 except ImportError:
     import numpy
-from abc import ABCMeta
+from abc import ABCMeta, ABC
 from abc import abstractmethod
 
 from .sequence import GAP_CODE
@@ -24,17 +24,36 @@ class Scoring(object):
         return 0
 
 
-class SimpleScoring(Scoring):
+class GapScoring(ABC):
+    @abstractmethod
+    def gapStart(self, element):
+        ...
 
-    def __init__(self, matchScore, mismatchScore):
+    @abstractmethod
+    def gapExtension(self, element):
+        ...
+    
+
+
+class SimpleScoring(GapScoring, Scoring):
+
+    def __init__(self, matchScore, mismatchScore, gapStartScore = 0, gapExtensionScore = 0):
         self.matchScore = matchScore
         self.mismatchScore = mismatchScore
+        self.gapStartScore = gapStartScore
+        self.gapExtensionScore = gapExtensionScore
 
     def __call__(self, firstElement, secondElement):
         if firstElement == secondElement:
             return self.matchScore
         else:
             return self.mismatchScore
+
+    def gapStart(self, element):
+        return self.gapStartScore
+
+    def gapExtension(self, element):
+        return self.gapExtensionScore
 
 
 # Alignment -------------------------------------------------------------------
@@ -375,8 +394,8 @@ class StrictGlobalSequenceAligner(SequenceAligner):
 
 class LocalSequenceAligner(SequenceAligner):
 
-    def __init__(self, scoring, gapScore, gapExtensionScore, minScore=None):
-        super(LocalSequenceAligner, self).__init__(scoring, gapScore, gapExtensionScore)
+    def __init__(self, scoring, minScore=None):
+        super(LocalSequenceAligner, self).__init__(scoring, 0, 0)
         self.minScore = minScore
 
     def computeAlignmentMatrix(self, first, second):
@@ -422,9 +441,9 @@ class LocalSequenceAligner(SequenceAligner):
                 f.setDirection(MatrixType.F ,i, j, dirAb)
                 if i > 1 or j > 1:
                     # Gap on sequenceA.
-                    prevF = f.getScore(MatrixType.F ,i, j - 1) + self.gapScore
+                    prevF = f.getScore(MatrixType.F ,i, j - 1) + self.scoring.gapStart(second[j-1])
                     prevIx = f.getScore(MatrixType.IX ,i, j - 1)
-                    prevIy = f.getScore(MatrixType.IY ,i, j - 1) + self.gapScore
+                    prevIy = f.getScore(MatrixType.IY ,i, j - 1) + self.scoring.gapStart(second[j-1])
                     maxScore = max(prevF, prevIx, prevIy)
                     dirGa = [
                         dir for
@@ -435,12 +454,12 @@ class LocalSequenceAligner(SequenceAligner):
                         ]
                         if score == maxScore
                     ]
-                    f.setScore(MatrixType.IX ,i, j, max(0, maxScore + self.gapExtensionScore))
+                    f.setScore(MatrixType.IX ,i, j, max(0, maxScore + self.scoring.gapExtension(second[j-1])))
                     f.setDirection(MatrixType.IX ,i, j, dirGa)
 
                     # Gap on sequenceB.
-                    prevF = f.getScore(MatrixType.F ,i - 1, j) + self.gapScore
-                    prevIx = f.getScore(MatrixType.IX ,i - 1, j) + self.gapScore
+                    prevF = f.getScore(MatrixType.F ,i - 1, j) + self.scoring.gapStart(first[i-1])
+                    prevIx = f.getScore(MatrixType.IX ,i - 1, j) + self.scoring.gapStart(first[i-1])
                     prevIy = f.getScore(MatrixType.IY ,i - 1, j)
                     maxScore = max(prevF, prevIx, prevIy)
                     dirGb = [
@@ -452,7 +471,7 @@ class LocalSequenceAligner(SequenceAligner):
                         ]
                         if score == maxScore
                     ]
-                    f.setScore(MatrixType.IY ,i,j, max(0, maxScore + self.gapExtensionScore))
+                    f.setScore(MatrixType.IY ,i,j, max(0, maxScore + self.scoring.gapExtension(first[i-1])))
                     f.setDirection(MatrixType.IY ,i, j, dirGb)
 
         return f
