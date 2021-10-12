@@ -70,12 +70,14 @@ class SequenceAlignment(object):
             self.identicalCount = 0
             self.similarCount = 0
             self.gapCount = 0
+            self.preservedCount = 0
         else:
             self.scores = list(other.scores)
             self.score = other.score
             self.identicalCount = other.identicalCount
             self.similarCount = other.similarCount
             self.gapCount = other.gapCount
+            self.preservedCount = other.preservedCount
 
     def push(self, firstElement, secondElement, score=0):
         self.first.push(firstElement)
@@ -88,7 +90,8 @@ class SequenceAlignment(object):
             self.similarCount += 1
         if firstElement == self.gap or secondElement == self.gap:
             self.gapCount += 1
-        pass
+        else:
+            self.preservedCount += 1
 
     def pop(self):
         firstElement = self.first.pop()
@@ -101,6 +104,8 @@ class SequenceAlignment(object):
             self.similarCount -= 1
         if firstElement == self.gap or secondElement == self.gap:
             self.gapCount -= 1
+        else:
+            self.preservedCount -= 1
         return firstElement, secondElement
 
     def key(self):
@@ -116,10 +121,22 @@ class SequenceAlignment(object):
             return float(self.identicalCount) / len(self) * 100.0
         except ZeroDivisionError:
             return 0.0
+    
+    def percentPreservedIdentity(self):
+        try:
+            return float(self.identicalCount) / self.preservedCount * 100.0
+        except ZeroDivisionError:
+            return 0.0
 
     def percentSimilarity(self):
         try:
             return float(self.similarCount) / len(self) * 100.0
+        except ZeroDivisionError:
+            return 0.0
+    
+    def percentPreservedSimilarity(self):
+        try:
+            return float(self.similarCount) / self.preservedCount * 100.0
         except ZeroDivisionError:
             return 0.0
 
