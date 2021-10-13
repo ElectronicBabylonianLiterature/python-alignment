@@ -260,8 +260,8 @@ class SequenceAligner(object):
 
 class GlobalSequenceAligner(SequenceAligner):
 
-    def __init__(self, scoring, gapScore, gapExtensionScore):
-        super(GlobalSequenceAligner, self).__init__(scoring, gapScore, gapExtensionScore)
+    def __init__(self, scoring):
+        super(GlobalSequenceAligner, self).__init__(scoring, 0, 0)
 
     def computeAlignmentMatrix(self, first, second):
         m = len(first) + 1
@@ -270,70 +270,152 @@ class GlobalSequenceAligner(SequenceAligner):
         for i in range(1, m):
             for j in range(1, n):
                 # Match elements.
-                ab = f.getScore(MatrixType.F, i - 1, j - 1) \
-                    + self.scoring(first[i - 1], second[j - 1])
+                prevF = f.getScore(MatrixType.F ,i - 1, j - 1)
+                prevIx = f.getScore(MatrixType.IX ,i - 1, j - 1)
+                prevIy = f.getScore(MatrixType.IY ,i - 1, j - 1)
+                maxScore = max(prevF, prevIx, prevIy)
+                dirAb = [
+                    dir for
+                    score, dir in [
+                        (prevF, MatrixType.F),
+                        (prevIx, MatrixType.IX),
+                        (prevIy, MatrixType.IY)
+                    ]
+                    if score == maxScore
+                ]
+                f.setScore(MatrixType.F ,i, j, maxScore + self.scoring(first[i - 1], second[j - 1]))
+                f.setDirection(MatrixType.F ,i, j, dirAb)
 
                 # Gap on first sequence.
                 if i == m - 1:
-                    ga = f.getScore(MatrixType.F, i, j - 1)
+                    prevF = f.getScore(MatrixType.F ,i, j - 1)
+                    prevIx = f.getScore(MatrixType.IX ,i, j - 1)
+                    prevIy = f.getScore(MatrixType.IY ,i, j - 1)
+                    maxScore = max(prevF, prevIx, prevIy)
+                    dirGa = [
+                        dir for
+                        score, dir in [
+                            (prevF, MatrixType.F),
+                            (prevIx, MatrixType.IX),
+                            (prevIy, MatrixType.IY)
+                        ]
+                        if score == maxScore
+                    ]
+                    f.setScore(MatrixType.IX ,i, j, maxScore)
+                    f.setDirection(MatrixType.IX ,i, j, dirGa)
                 else:
-                    ga = f.getScore(MatrixType.F, i, j - 1) + self.gapScore
+                    prevF = f.getScore(MatrixType.F ,i, j - 1) + self.scoring.gapStart(second[j-1])
+                    prevIx = f.getScore(MatrixType.IX ,i, j - 1)
+                    prevIy = f.getScore(MatrixType.IY ,i, j - 1) + self.scoring.gapStart(second[j-1])
+                    maxScore = max(prevF, prevIx, prevIy)
+                    dirGa = [
+                        dir for
+                        score, dir in [
+                            (prevF, MatrixType.F),
+                            (prevIx, MatrixType.IX),
+                            (prevIy, MatrixType.IY)
+                        ]
+                        if score == maxScore
+                    ]
+                    f.setScore(MatrixType.IX ,i, j, maxScore + self.scoring.gapExtension(second[j-1]))
+                    f.setDirection(MatrixType.IX ,i, j, dirGa)
 
                 # Gap on second sequence.
                 if j == n - 1:
-                    gb = f.getScore(MatrixType.F, i - 1, j)
+                    prevF = f.getScore(MatrixType.F ,i - 1, j)
+                    prevIx = f.getScore(MatrixType.IX ,i - 1, j)
+                    prevIy = f.getScore(MatrixType.IY ,i - 1, j)
+                    maxScore = max(prevF, prevIx, prevIy)
+                    dirGb = [
+                        dir for
+                        score, dir in [
+                            (prevF, MatrixType.F),
+                            (prevIx, MatrixType.IX),
+                            (prevIy, MatrixType.IY)
+                        ]
+                        if score == maxScore
+                    ]
+                    f.setScore(MatrixType.IY ,i,j, maxScore)
+                    f.setDirection(MatrixType.IY ,i, j, dirGb)
                 else:
-                    gb = f.getScore(MatrixType.F, i - 1, j) + self.gapScore
+                    prevF = f.getScore(MatrixType.F ,i - 1, j) + self.scoring.gapStart(first[i-1])
+                    prevIx = f.getScore(MatrixType.IX ,i - 1, j) + self.scoring.gapStart(first[i-1])
+                    prevIy = f.getScore(MatrixType.IY ,i - 1, j)
+                    maxScore = max(prevF, prevIx, prevIy)
+                    dirGb = [
+                        dir for
+                        score, dir in [
+                            (prevF, MatrixType.F),
+                            (prevIx, MatrixType.IX),
+                            (prevIy, MatrixType.IY)
+                        ]
+                        if score == maxScore
+                    ]
+                    f.setScore(MatrixType.IY ,i,j, maxScore + self.scoring.gapExtension(first[i-1]))
+                    f.setDirection(MatrixType.IY ,i, j, dirGb)
 
-                f.setScore(MatrixType.F, i, j, max(ab, ga, gb))
         return f
 
     def bestScore(self, f):
-        return f.getScore(MatrixType.F, -1, -1)
+        return max(f.getScore(type_, -1, -1) for type_ in MatrixType)
 
     def backtrace(self, first, second, f):
         m, n = f.shape
         alignments = list()
         alignment = self.emptyAlignment(first, second)
-        self.backtraceFrom(first, second, f, m - 1, n - 1,
-                           alignments, alignment)
+
+        for type_ in MatrixType:
+            if (f.getScore(type_, -1, -1) >= self.bestScore(f)):
+                self.backtraceFrom(first, second, f, m - 1, n - 1, alignments, alignment, type_)
+        
         return alignments
 
-    def backtraceFrom(self, first, second, f, i, j, alignments, alignment):
+    def backtraceFrom(self, first, second, f, i, j, alignments, alignment, current):
         if i == 0 or j == 0:
-            alignments.append(alignment.reversed())
+            if current == MatrixType.F:
+                alignments.append(alignment.reversed())
         else:
             m, n = f.shape
-            c = f.getScore(MatrixType.F ,i, j)
-            p = f.getScore(MatrixType.F ,i - 1, j - 1)
-            x = f.getScore(MatrixType.F ,i - 1, j)
-            y = f.getScore(MatrixType.F ,i, j - 1)
+            directions = f.getDirection(current, i, j)
+            c = f.getScore(current, i, j)
             a = first[i - 1]
             b = second[j - 1]
-            if c == p + self.scoring(a, b):
-                alignment.push(a, b, c - p)
-                self.backtraceFrom(first, second, f, i - 1, j - 1,
-                                   alignments, alignment)
-                alignment.pop()
-            else:
+
+            if current == MatrixType.F:
+                for dir in directions:
+                    p = f.getScore(dir, i - 1, j - 1)
+                    alignment.push(a, b, c - p)
+                    self.backtraceFrom(first, second, f, i - 1, j - 1,
+                                    alignments, alignment, dir)
+                    alignment.pop()
+            elif current == MatrixType.IX:
                 if i == m - 1:
-                    if c == y:
+                    for dir in directions:
+                        y = f.getScore(dir, i, j - 1)
+                        if c == y:
+                            self.backtraceFrom(first, second, f, i, j - 1,
+                                               alignments, alignment, dir)
+                else: 
+                    for dir in directions:
+                        y = f.getScore(dir, i, j - 1)
+                        alignment.push(alignment.gap, b, c - y)
                         self.backtraceFrom(first, second, f, i, j - 1,
-                                           alignments, alignment)
-                elif c == y + self.gapScore:
-                    alignment.push(alignment.gap, b, c - y)
-                    self.backtraceFrom(first, second, f, i, j - 1,
-                                       alignments, alignment)
-                    alignment.pop()
+                                           alignments, alignment, dir)
+                        alignment.pop()
+            elif current == MatrixType.IY:
                 if j == n - 1:
-                    if c == x:
+                     for dir in directions:
+                        x = f.getScore(dir, i - 1, j)
+                        if c == x:
+                            self.backtraceFrom(first, second, f, i - 1, j,
+                                            alignments, alignment, dir)
+                else:
+                    for dir in directions:
+                        x = f.getScore(dir, i - 1, j)
+                        alignment.push(a, alignment.gap, c - x)
                         self.backtraceFrom(first, second, f, i - 1, j,
-                                           alignments, alignment)
-                elif c == x + self.gapScore:
-                    alignment.push(a, alignment.gap, c - x)
-                    self.backtraceFrom(first, second, f, i - 1, j,
-                                       alignments, alignment)
-                    alignment.pop()
+                                        alignments, alignment, dir)
+                        alignment.pop()
 
 
 class StrictGlobalSequenceAligner(SequenceAligner):

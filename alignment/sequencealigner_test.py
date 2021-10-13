@@ -105,7 +105,7 @@ class SequenceAlignerTests(object):
         assert alignments[0].percentPreservedIdentity() == 100.0
         assert alignments[0].percentPreservedSimilarity() == 100.0
         assert alignments[0].percentGap() == 2.0 / 6.0 * 100.0
-        assert score == DEFAULT_MATCH_SCORE * 4 + DEFAULT_GAP_SCORE * 2
+        assert score == DEFAULT_MATCH_SCORE * 4 + DEFAULT_GAP_START_SCORE + DEFAULT_GAP_EXTENSION_SCORE * 2
         assert alignments[0].score == score
 
     def test_exact_left_partial_match_with_mismatch(self):
@@ -123,11 +123,11 @@ class SequenceAlignerTests(object):
 
 
 class TestGlobalSequenceAligner(SequenceAlignerTests):
-    ALIGNER = GlobalSequenceAligner(DEFAULT_SCORING, DEFAULT_GAP_SCORE, DEFAULT_GAP_EXTENSION_SCORE)
+    ALIGNER = GlobalSequenceAligner(AFFINE_GAP_SCORING)
 
     def test_multiple_alignments(self):
         score, alignments = self.align('xabcabcy', 'abc')
-        assert len(alignments) == 1
+        assert len(alignments) == 2
         assert str(alignments[0].first) == 'a b c'
         assert str(alignments[0].second) == 'a b c'
         assert alignments[0].percentIdentity() == 3.0 / 3.0 * 100.0
@@ -222,6 +222,18 @@ class TestStrictGlobalSequenceAligner(SequenceAlignerTests):
         assert score == DEFAULT_MATCH_SCORE * 3 + DEFAULT_GAP_SCORE * 5
         assert alignments[0].score == score
 
+    def test_exact_left_match_with_gap_extension(self):
+        score, alignments = self.align('aabb', 'aaoobb')
+        assert len(alignments) == 1
+        assert str(alignments[0].first) == 'a a - - b b'
+        assert str(alignments[0].second) == 'a a o o b b'
+        assert alignments[0].percentIdentity() == 4.0 / 6.0 * 100.0
+        assert alignments[0].percentSimilarity() == 4.0 / 6.0 * 100.0
+        assert alignments[0].percentPreservedIdentity() == 100.0
+        assert alignments[0].percentPreservedSimilarity() == 100.0
+        assert alignments[0].percentGap() == 2.0 / 6.0 * 100.0
+        assert score == DEFAULT_MATCH_SCORE * 4 + DEFAULT_GAP_SCORE * 2
+        assert alignments[0].score == score
 
 class TestLocalSequenceAligner(SequenceAlignerTests):
     ALIGNER = LocalSequenceAligner(AFFINE_GAP_SCORING)
@@ -267,17 +279,4 @@ class TestLocalSequenceAligner(SequenceAlignerTests):
         assert alignments[0].percentPreservedSimilarity() == 100.0
         assert alignments[0].percentGap() == 0.0
         assert score == DEFAULT_MATCH_SCORE * 2
-        assert alignments[0].score == score
-
-    def test_exact_left_match_with_gap_extension(self):
-        score, alignments = self.align('aabb', 'aaoobb')
-        assert len(alignments) == 1
-        assert str(alignments[0].first) == 'a a - - b b'
-        assert str(alignments[0].second) == 'a a o o b b'
-        assert alignments[0].percentIdentity() == 4.0 / 6.0 * 100.0
-        assert alignments[0].percentSimilarity() == 4.0 / 6.0 * 100.0
-        assert alignments[0].percentPreservedIdentity() == 100.0
-        assert alignments[0].percentPreservedSimilarity() == 100.0
-        assert alignments[0].percentGap() == 2.0 / 6.0 * 100.0
-        assert score == DEFAULT_MATCH_SCORE * 4 + DEFAULT_GAP_START_SCORE + DEFAULT_GAP_EXTENSION_SCORE * 2
         assert alignments[0].score == score
