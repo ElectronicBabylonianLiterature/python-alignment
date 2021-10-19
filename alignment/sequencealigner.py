@@ -260,8 +260,9 @@ class SequenceAligner(object):
 
 class GlobalSequenceAligner(SequenceAligner):
 
-    def __init__(self, scoring):
+    def __init__(self, scoring, fastBacktrace=False):
         super(GlobalSequenceAligner, self).__init__(scoring, 0, 0)
+        self._fastBacktrace = fastBacktrace
 
     def computeAlignmentMatrix(self, first, second):
         m = len(first) + 1
@@ -364,8 +365,12 @@ class GlobalSequenceAligner(SequenceAligner):
         alignments = list()
         alignment = self.emptyAlignment(first, second)
 
-        for type_ in MatrixType:
-            if (f.getScore(type_, -1, -1) >= self.bestScore(f)):
+        bestTypes = [
+            type_ for type_ in MatrixType
+            if (f.getScore(type_, -1, -1) >= self.bestScore(f))
+        ]
+
+        for type_ in bestTypes[:1] if self._fastBacktrace else bestTypes:
                 self.backtraceFrom(first, second, f, m - 1, n - 1, alignments, alignment, type_)
         
         return alignments
@@ -376,7 +381,8 @@ class GlobalSequenceAligner(SequenceAligner):
                 alignments.append(alignment.reversed())
         else:
             m, n = f.shape
-            directions = f.getDirection(current, i, j)
+            allDirections = f.getDirection(current, i, j)
+            directions = allDirections[:1] if self._fastBacktrace else allDirections
             c = f.getScore(current, i, j)
             a = first[i - 1]
             b = second[j - 1]
