@@ -14,5 +14,5 @@ setup(
     license='BSD 3-Clause License',
     description='Native Python library for generic sequence alignment.',
     long_description=open('README.rst').read(),
-    requires=['numpy', 'six'],
+    requires=['six'],
 )

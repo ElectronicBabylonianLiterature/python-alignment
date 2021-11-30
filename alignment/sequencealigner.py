@@ -1,12 +1,9 @@
 from enum import IntEnum
+import sys
 
 from six import text_type
 from six.moves import range
 
-try:
-    import numpypy as numpy
-except ImportError:
-    import numpy
 from abc import ABCMeta, ABC
 from abc import abstractmethod
 
@@ -184,6 +181,15 @@ class SequenceAlignment(object):
 
 
 # Aligner ---------------------------------------------------------------------
+def make_matrix(shape, factory):
+    i, j = shape
+    result = []
+    for col in range(0, i):
+        result.append([])
+        for row in range(0, j):
+            result[col].append(factory())
+            
+    return result
 
 class MatrixType(IntEnum):
     F = 1
@@ -194,31 +200,31 @@ class AlignmentMatrix:
     def __init__(self, shape=(0,0)):
         self.shape = shape
         self.matrix = {
-            MatrixType.F: numpy.zeros(shape, int),
-            MatrixType.IX: numpy.zeros(shape, int),
-            MatrixType.IY: numpy.zeros(shape, int)
+            MatrixType.F: make_matrix(shape, int),
+            MatrixType.IX: make_matrix(shape, int),
+            MatrixType.IY: make_matrix(shape, int)
         }
         self.direction = {
-            MatrixType.F: numpy.zeros(shape, list),
-            MatrixType.IX: numpy.zeros(shape, list),
-            MatrixType.IY: numpy.zeros(shape, list)
+            MatrixType.F: make_matrix(shape, list),
+            MatrixType.IX: make_matrix(shape, list),
+            MatrixType.IY: make_matrix(shape, list)
         }
 
     def getScore(self, type, i, j):
-        return self.matrix[type][i,j]
+        return self.matrix[type][i][j]
 
     def setScore(self, type, i, j, score):
-        self.matrix[type][i,j] = score
+        self.matrix[type][i][j] = score
 
     def getDirection(self, type, i, j):
-        return self.direction[type][i,j]
+        return self.direction[type][i][j]
 
     def setDirection(self, type, i, j, direction):
-        self.direction[type][i,j] = direction
+        self.direction[type][i][j] = direction
     
     def max(self):
         return max(
-            self.matrix[type].max() for type in MatrixType
+            max(map(max, self.matrix[type])) for type in MatrixType
         )
 
 class SequenceAligner(object):
@@ -507,7 +513,7 @@ class LocalSequenceAligner(SequenceAligner):
         m = len(first) + 1
         n = len(second) + 1
         f = AlignmentMatrix((m, n))
-        min = numpy.iinfo(numpy.int32).min
+        min = -sys.maxsize
 
         for i in range(1, m):
             f.setScore(MatrixType.F, i, 0, min)

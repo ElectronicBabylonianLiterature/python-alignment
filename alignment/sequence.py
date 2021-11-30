@@ -1,11 +1,6 @@
 from __future__ import print_function
 from six import text_type
 
-try:
-    import numpypy as numpy
-except ImportError:
-    import numpy
-
 
 GAP_ELEMENT = '-'
 GAP_CODE = 0
@@ -88,17 +83,10 @@ class EncodedSequence(BaseSequence):
 
     def __init__(self, argument, id=None):
         if isinstance(argument, int):
-            super(EncodedSequence, self).__init__(
-                numpy.zeros(argument, int), id)
+            super(EncodedSequence, self).__init__([0] * argument, id)
             self.position = 0
         else:
-            if isinstance(argument, numpy.ndarray) \
-                    and argument.dtype.name.startswith('int'):
-                super(EncodedSequence, self).__init__(
-                    numpy.array(argument), id)
-            else:
-                super(EncodedSequence, self).__init__(
-                    numpy.array(list(argument), int), id)
+            super(EncodedSequence, self).__init__(list(argument), id)
             self.position = len(self.elements)
 
     def push(self, element):
