@@ -34,8 +34,8 @@ Typical usage looks like this::
     bEncoded = v.encodeSequence(b)
 
     # Create a scoring and align the sequences using global aligner.
-    scoring = SimpleScoring(2, -1)
-    aligner = GlobalSequenceAligner(scoring, -2)
+    scoring = SimpleScoring(2, -1, -2, -1)
+    aligner = GlobalSequenceAligner(scoring)
     score, encodeds = aligner.align(aEncoded, bEncoded, backtrace=True)
 
     # Iterate over optimal alignments and print them.
